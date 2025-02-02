@@ -1,0 +1,6 @@
+#!/bin/bash
+
+#SBATCH --nodes=1 --ntasks-per-node=1
+#SBATCH --partition=spacemit-rv64gc
+
+./prog.gcc

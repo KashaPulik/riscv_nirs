@@ -125,7 +125,7 @@ void thread_func_cas()
         {
             expected = g_var_cas;
 #ifdef __riscv
-        } while (atomic_compare_exchange_strong(&g_var_cas, expected, expected + 1) != expected);
+        } while (atomic_compare_exchange_strong(&g_var_cas, &expected, expected + 1) != expected);
 #elif defined(__x86_64)
         } while (atomic_cas_x86(&g_var_cas, expected, expected + 1) != expected);
 #endif
