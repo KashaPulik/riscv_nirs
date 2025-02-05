@@ -3,3 +3,6 @@ riscv:
 
 x86-64:
 	g++ -Wall -O2 -o prog main.cpp
+
+clean:
+	rm -rf prog prog.gcc
