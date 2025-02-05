@@ -92,11 +92,7 @@ volatile uint32_t g_var_cas = 0;
 void thread_func_add()
 {
     for (int i = 0; i < ITERATIONS; i++) {
-#ifdef __riscv
         atomic_fetch_add(&g_var_add, 1);
-#elif defined(__x86_64)
-        atomic_add_x86(&g_var_add, 1);
-#endif
     }
 }
 
@@ -104,26 +100,40 @@ void thread_func_add()
 // Здесь каждый поток пытается увеличить значение переменной,
 // сначала считывая текущее значение, затем заменяя его на value+1,
 // если оно не изменилось.
+// void thread_func_cas()
+// {
+//     for (int i = 0; i < ITERATIONS; i++) {
+//         uint32_t expected;
+//         do {
+//             expected = g_var_cas;
+// #ifdef __riscv
+//         } while (atomic_compare_exchange_strong(&g_var_cas, &expected, expected + 1) != expected);
+// #elif defined(__x86_64)
+//         } while (atomic_compare_exchange_strong(&g_var_cas, &expected, expected + 1) != true);
+// #endif
+//     }
+// }
+
 void thread_func_cas()
 {
     for (int i = 0; i < ITERATIONS; i++) {
         uint32_t expected;
         do {
             expected = g_var_cas;
-#ifdef __riscv
-        } while (atomic_compare_exchange_strong(&g_var_cas, &expected, expected + 1) != expected);
-#elif defined(__x86_64)
-        } while (atomic_cas_x86(&g_var_cas, expected, expected + 1) != expected);
-#endif
+        } while (atomic_compare_exchange_strong(&g_var_cas, &expected, expected + 1) != true);
     }
 }
 
 int main()
 {
 #ifdef __riscv
-    printf("Тестирование атомарных операций для RISC-V с использованием %d потоков и %d итераций\n", NUM_THREADS, ITERATIONS);
+    printf("Тестирование атомарных операций для RISC-V с использованием %d потоков и %d итераций\n",
+           NUM_THREADS,
+           ITERATIONS);
 #elif defined(__x86_64)
-    printf("Тестирование атомарных операций для x86-64 с использованием %d потоков и %d итераций\n", NUM_THREADS, ITERATIONS);
+    printf("Тестирование атомарных операций для x86-64 с использованием %d потоков и %d итераций\n",
+           NUM_THREADS,
+           ITERATIONS);
 #endif
 
     // Тест атомарного сложения
