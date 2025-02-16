@@ -8,7 +8,7 @@
 
 // Количество потоков и число итераций для каждого потока
 #define NUM_THREADS 2
-#define ITERATIONS 100'000'000
+#define ITERATIONS 1'000'000
 
 // Глобальные разделяемые переменные для тестов
 volatile uint32_t g_var_exch = 0;
@@ -17,6 +17,8 @@ volatile uint32_t g_var_and = 0xffffffff;
 volatile uint32_t g_var_or = 0;
 volatile uint32_t g_var_xor = 0;
 volatile uint32_t g_var_cas = 0;
+
+volatile uint64_t count = 0;
 
 
 #if defined(__x86_64)
@@ -40,43 +42,60 @@ uint64_t rdtscp() {
 
 void thread_func_exch()
 {
+    uint64_t start;
     for (int i = 1; i <= ITERATIONS; i++) {
+        start = rdtscp();
         atomic_exchange(&g_var_exch, i);
+        count += rdtscp() - start;
     }
 }
 
 void thread_func_add()
 {
+    uint64_t start;
     for (int i = 0; i < ITERATIONS; i++) {
+        start = rdtscp();
         atomic_fetch_add(&g_var_add, 1);
+        count += rdtscp() - start;
     }
 }
 
 void thread_func_and()
 {
+    uint64_t start;
     for (int i = 0; i < ITERATIONS; i++) {
+        start = rdtscp();
         atomic_fetch_and(&g_var_and, i);
+        count += rdtscp() - start;
     }
 }
 
 void thread_func_or()
 {
+    uint64_t start;
     for (int i = 0; i < ITERATIONS; i++) {
+        start = rdtscp();
         atomic_fetch_or(&g_var_or, i);
+        count += rdtscp() - start;
     }
 }
 
 void thread_func_xor()
 {
+    uint64_t start;
     for (int i = 0; i < ITERATIONS; i++) {
+        start = rdtscp();
         atomic_fetch_xor(&g_var_xor, i);
+        count += rdtscp() - start;
     }
 }
 
 void thread_func_cas()
 {
+    uint64_t start;
     for (int i = 0; i < ITERATIONS; i++) {
         uint32_t expected;
+        start = rdtscp();
         do {
             expected = g_var_cas;
 #ifdef __riscv
@@ -84,6 +103,7 @@ void thread_func_cas()
 #elif defined(__x86_64)
         } while (atomic_compare_exchange_strong(&g_var_cas, &expected, expected + 1) != true);
 #endif
+        count += rdtscp() - start;
     }
 }
 
@@ -106,6 +126,23 @@ void test_exch()
     std::chrono::duration<double> duration = (end - start) / NUM_THREADS / ITERATIONS;
 
     std::cout << "Атомарный обмен за " << duration.count() << " секунд\n";
+}
+
+void test_exch_timer()
+{
+    count = 0;
+
+    {
+        std::vector<std::thread> threads;
+        for (int i = 0; i < NUM_THREADS; i++) {
+            threads.emplace_back(thread_func_exch);
+        }
+        for (auto& t : threads) {
+            t.join();
+        }
+    }
+
+    std::cout << "Атомарный обмен за " << count / ITERATIONS << " тактов\n";
 }
 
 void test_add()
@@ -224,14 +261,8 @@ int main()
            NUM_THREADS,
            ITERATIONS);
 #endif
-    volatile int i = 0;
-    uint64_t count = rdtscp();
-
-    while (i < 1'000)
-        atomic_fetch_add(&i, 1);
-    count = rdtscp() - count;
-
-    std::cout << count << '\n';
+    test_exch_timer();
+    std::cout << "g_var_exch = " << g_var_exch << '\n';
 
     // test_exch();
     // test_add();
