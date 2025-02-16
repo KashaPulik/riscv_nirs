@@ -8,7 +8,7 @@
 
 // Количество потоков и число итераций для каждого потока
 #define NUM_THREADS 2
-#define ITERATIONS 1'000'000
+#define ITERATIONS 100'000'000
 
 // Глобальные разделяемые переменные для тестов
 volatile uint32_t g_var_exch = 0;
@@ -17,6 +17,24 @@ volatile uint32_t g_var_and = 0xffffffff;
 volatile uint32_t g_var_or = 0;
 volatile uint32_t g_var_xor = 0;
 volatile uint32_t g_var_cas = 0;
+
+
+#if defined(__x86_64)
+uint64_t rdtscp()
+{
+    uint32_t lo, hi;
+    asm volatile("rdtscp" : "=a"(lo), "=d"(hi)::"rcx"); // RDTSCP
+    return (static_cast<uint64_t>(hi) << 32) | lo;
+}
+#endif
+
+#if defined(__riscv)
+uint64_t rdtscp() {
+    uint64_t time;
+    asm volatile ("csrr %0, time" : "=r"(time)); // Читаем CSR time
+    return time;
+}
+#endif
 
 // Функции, выполняемые потоками для атомарного сложения
 
@@ -51,7 +69,7 @@ void thread_func_or()
 void thread_func_xor()
 {
     for (int i = 0; i < ITERATIONS; i++) {
-    atomic_fetch_xor(&g_var_xor, i);
+        atomic_fetch_xor(&g_var_xor, i);
     }
 }
 
@@ -206,22 +224,30 @@ int main()
            NUM_THREADS,
            ITERATIONS);
 #endif
+    volatile int i = 0;
+    uint64_t count = rdtscp();
 
-    test_exch();
-    test_add();
-    test_and();
-    test_or();
-    test_xor();
-    test_cas();
+    while (i < 1'000)
+        atomic_fetch_add(&i, 1);
+    count = rdtscp() - count;
 
-    // Вывод итоговых значений
-    std::cout << "Итоговые значения: ";
-    std::cout << "g_var_exch = " << g_var_exch;
-    std::cout << ", g_var_add = " << g_var_add;
-    std::cout << ", g_var_and = " << g_var_and;
-    std::cout << ", g_var_or = " << g_var_or;
-    std::cout << ", g_var_xor = " << g_var_xor;
-    std::cout << ", g_var_cas = " << g_var_cas;
-    std::cout << '\n';
-    return 0;
+    std::cout << count << '\n';
+
+    // test_exch();
+    // test_add();
+    // test_and();
+    // test_or();
+    // test_xor();
+    // test_cas();
+
+    // // Вывод итоговых значений
+    // std::cout << "Итоговые значения: ";
+    // std::cout << "g_var_exch = " << g_var_exch;
+    // std::cout << ", g_var_add = " << g_var_add;
+    // std::cout << ", g_var_and = " << g_var_and;
+    // std::cout << ", g_var_or = " << g_var_or;
+    // std::cout << ", g_var_xor = " << g_var_xor;
+    // std::cout << ", g_var_cas = " << g_var_cas;
+    // std::cout << '\n';
+    // return 0;
 }
